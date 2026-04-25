@@ -18,7 +18,17 @@ def _default_sqlite_url() -> str:
     return f"sqlite:///{db_path.as_posix()}"
 
 
-DATABASE_URL = os.getenv("DATABASE_URL") or _default_sqlite_url()
+def _normalize_database_url(raw_url: str) -> str:
+    """
+    Some platforms provide postgres:// URLs; SQLAlchemy expects postgresql://
+    """
+    url = (raw_url or "").strip()
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
+DATABASE_URL = _normalize_database_url(os.getenv("DATABASE_URL") or _default_sqlite_url())
 
 connect_args = {}
 if DATABASE_URL.lower().startswith("sqlite"):
