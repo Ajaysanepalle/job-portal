@@ -79,6 +79,9 @@ Or use VS Code Live Server extension, or any other local server.
 
 Open `http://localhost:8080` in your browser.
 
+For deployment configuration:
+- Frontend API base URL is controlled by `frontend/config.js`.
+
 ## Default Admin Credentials
 
 - **Username**: admin
@@ -152,11 +155,15 @@ job-portal/
    git push heroku main
    ```
 
-### Option 2: Railway (Free)
+### Option 2: Railway
 
-1. Go to https://railway.app
-2. Connect GitHub repository
-3. Deploy directly
+Use the full guide in `RAILWAY_DEPLOYMENT.md`.
+
+Quick summary:
+1. Deploy `backend` as one Railway service
+2. Add Railway PostgreSQL and set `DATABASE_URL`
+3. Deploy `frontend` as second Railway service
+4. Set `frontend/config.js` with backend API URL
 
 ### Option 3: PythonAnywhere (Free)
 

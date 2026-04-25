@@ -8,6 +8,8 @@ import schemas
 from database import engine, get_db
 from auth import hash_password, verify_password, create_access_token, verify_token
 import os
+from rag_store import build_or_rebuild_index, query_jobs, ensure_index
+from free_llm import try_free_llm_answer
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -278,6 +280,98 @@ def get_job_stats(job_id: int, db: Session = Depends(get_db)):
 def health_check():
     """Health check endpoint"""
     return {"status": "OK"}
+
+
+# ===================== RAG (JOB SUGGESTION) =====================
+
+@app.post("/api/rag/reindex")
+def rag_reindex(token: str, db: Session = Depends(get_db)):
+    """
+    Admin-only: rebuild the local RAG index.
+    """
+    _ = get_current_admin(token)
+    idx = build_or_rebuild_index(db)
+    return {"ok": True, "built_at": idx.get("built_at"), "jobs_indexed": len(idx.get("job_ids", []))}
+
+
+@app.get("/api/rag/ask")
+def rag_ask(q: str, k: int = 5, db: Session = Depends(get_db)):
+    """
+    Ask a question and get suggested jobs to apply for.
+    """
+    ensure_index(db)
+    suggestions = query_jobs(db, q, top_k=k)
+    if not suggestions:
+        return {"query": q, "suggestions": []}
+
+    job_ids = [s.job_id for s in suggestions]
+    jobs = (
+        db.query(models.Job)
+        .filter(models.Job.id.in_(job_ids), models.Job.is_active == True)  # noqa: E712
+        .all()
+    )
+    jobs_by_id = {j.id: j for j in jobs}
+
+    out = []
+    for s in suggestions:
+        j = jobs_by_id.get(s.job_id)
+        if not j:
+            continue
+        out.append(
+            {
+                "score": round(s.score, 4),
+                "job": {
+                    "id": j.id,
+                    "job_name": j.job_name,
+                    "company": j.company,
+                    "job_description": j.job_description,
+                    "eligible_years": j.eligible_years,
+                    "qualification": j.qualification,
+                    "link": j.link,
+                    "location": j.location,
+                    "last_date": j.last_date,
+                },
+            }
+        )
+
+    return {"query": q, "suggestions": out}
+
+
+@app.get("/api/rag/ask_llm")
+async def rag_ask_llm(q: str, k: int = 5, db: Session = Depends(get_db)):
+    """
+    Same as /api/rag/ask, but also returns a free-LLM answer when available.
+    Uses Ollama if running; otherwise falls back to retrieval-only.
+    """
+    base = rag_ask(q=q, k=k, db=db)
+    suggestions = base.get("suggestions", [])
+
+    context_lines = []
+    for item in suggestions[: min(len(suggestions), 6)]:
+        job = item.get("job", {})
+        context_lines.append(
+            f"- {job.get('job_name','')} @ {job.get('company','')} | {job.get('location','')} | exp: {job.get('eligible_years','')} | qual: {job.get('qualification','')} | last_date: {job.get('last_date','')} | apply: {job.get('link','')}\n"
+            f"  desc: {str(job.get('job_description',''))[:400]}"
+        )
+
+    prompt = (
+        "You are a job assistant. Answer the user's question using ONLY the jobs provided.\n"
+        "If nothing matches, say you couldn't find a good match and suggest better keywords.\n\n"
+        f"User question: {q}\n\n"
+        "Jobs:\n"
+        + ("\n".join(context_lines) if context_lines else "(no jobs)\n")
+        + "\n\n"
+        "Return:\n"
+        "1) A short helpful answer (2-6 lines)\n"
+        "2) A bullet list of up to 5 best jobs to apply with job title + company + reason\n"
+    )
+
+    answer, mode = await try_free_llm_answer(prompt)
+    return {
+        **base,
+        "answer": answer,
+        "llm_mode": mode,
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -156,6 +156,20 @@
             <button id="resetFilters" class="btn btn-secondary">Reset Filters</button>
         </section>
 
+        <!-- RAG Job Assistant -->
+        <section class="filters-section" style="margin-top: 10px;">
+            <div class="filter-group" style="flex: 1;">
+                <label for="ragQuestion">Ask about jobs</label>
+                <input id="ragQuestion" type="text" placeholder="e.g., Python fresher jobs in Hyderabad, internship for 2026 batch" />
+            </div>
+            <button id="ragAskBtn" class="btn btn-primary">
+                <i class="fas fa-magic"></i> Suggest Jobs
+            </button>
+        </section>
+        <section class="jobs-section" style="padding-top: 0;">
+            <div id="ragResults" class="jobs-grid"></div>
+        </section>
+
         <!-- Jobs Display Tabs -->
         <section class="jobs-section">
             <div class="jobs-tabs">
@@ -184,6 +198,7 @@
         <p>Made with <i class="fas fa-heart"></i> by Ajaysanepalle</p>
     </footer>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

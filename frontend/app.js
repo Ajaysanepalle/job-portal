@@ -1,4 +1,14 @@
-const API_BASE = "https://one-gy8u.onrender.com/api";
+const API_BASE = (() => {
+    const configured = window.APP_CONFIG?.API_BASE || "";
+    if (configured) return configured.replace(/\/+$/, "");
+
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1";
+    if (isLocal) return "http://localhost:8000/api";
+
+    // If frontend and backend are behind same domain/proxy.
+    return `${window.location.origin}/api`;
+})();
 
 let currentAdminToken = localStorage.getItem("adminToken");
 let allJobs = [];
@@ -622,6 +632,84 @@ document.getElementById("resetFilters").addEventListener("click", () => {
     document.querySelectorAll(".job-tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelector('[data-tab="all-jobs"]').classList.add("active");
     loadJobs();
+});
+
+// ============= RAG JOB ASSISTANT =============
+const ragQuestionEl = document.getElementById("ragQuestion");
+const ragAskBtn = document.getElementById("ragAskBtn");
+const ragResultsEl = document.getElementById("ragResults");
+
+async function askRag() {
+    const q = (ragQuestionEl?.value || "").trim();
+    if (!q) {
+        showAlert("Type a question first", "error");
+        return;
+    }
+
+    try {
+        showLoading(true);
+        ragResultsEl.innerHTML = "";
+
+        const resp = await fetch(`${API_BASE}/rag/ask_llm?q=${encodeURIComponent(q)}&k=6`);
+        const data = await resp.json();
+
+        const suggestions = data?.suggestions || [];
+        if (!resp.ok) {
+            showAlert(data?.detail || "Failed to get suggestions", "error");
+            return;
+        }
+
+        if (data?.answer) {
+            ragResultsEl.innerHTML = `
+                <div class="job-card" style="cursor: default;">
+                    <h3><i class="fas fa-robot"></i> Assistant</h3>
+                    <p style="white-space: pre-wrap; margin-top: 8px;">${data.answer}</p>
+                    <p style="opacity: 0.7; margin-top: 8px; font-size: 12px;">LLM: ${data.llm_mode || "fallback"}</p>
+                </div>
+            `;
+        }
+
+        if (suggestions.length === 0) {
+            ragResultsEl.innerHTML += '<div class="empty-state"><i class="fas fa-robot"></i><p>No matching jobs found. Try different keywords.</p></div>';
+            return;
+        }
+
+        ragResultsEl.innerHTML += suggestions.map(item => {
+            const job = item.job;
+            return `
+                <div class="job-card" onclick="viewJobDetails(${job.id})">
+                    <h3>${job.job_name}</h3>
+                    <p class="job-company"><i class="fas fa-building"></i> ${job.company}</p>
+                    <div class="job-meta">
+                        <div class="job-meta-item">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>${job.location}</span>
+                        </div>
+                        <div class="job-meta-item">
+                            <i class="fas fa-clock"></i>
+                            <span>${job.eligible_years}</span>
+                        </div>
+                    </div>
+                    <p class="job-description">${job.job_description}</p>
+                    <div class="job-footer">
+                        <span class="last-date"><i class="fas fa-calendar"></i> ${job.last_date}</span>
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); openJobLink('${job.link}')">
+                            Apply Now
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    } catch (e) {
+        showAlert("RAG error: " + e.message, "error");
+    } finally {
+        showLoading(false);
+    }
+}
+
+if (ragAskBtn) ragAskBtn.addEventListener("click", askRag);
+if (ragQuestionEl) ragQuestionEl.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") askRag();
 });
 
 // ============= ALERT HELPER =============

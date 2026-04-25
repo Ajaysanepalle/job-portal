@@ -6,11 +6,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///job_portal.db
+      # Persist DB outside the source mount so reloads/rebuilds don't wipe it.
+      - DATABASE_URL=sqlite:////data/job_portal.db
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=admin123
     volumes:
       - ./backend:/app
+      - job_portal_data:/data
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -33,3 +35,6 @@ services:
     depends_on:
       - backend
       - frontend
+
+volumes:
+  job_portal_data:
