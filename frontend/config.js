@@ -1,5 +1,3 @@
 window.APP_CONFIG = {
-    // Railway backend URL example:
-    // API_BASE: "https://your-backend-name.up.railway.app/api",
-    API_BASE: ""
+    API_BASE: "https://job-portal-6vea.onrender.com/api"
 };
