@@ -628,19 +628,22 @@ body {
 
 #ragQuestion{
     width:100%;
-    padding:20px 24px;
+    padding:14px 18px;
     border:none;
     border-radius:12px;
-    font-size:20px;
     background:#fff;
+    font-size:16px;
+    height:56px;
     box-shadow:0 4px 14px rgba(0,0,0,0.08);
     outline:none;
+}
+
+#ragQuestion::placeholder{
+   font-size:16px;
+   color:#888;
 }
 
 #ragQuestion:focus{
     box-shadow:0 0 0 4px rgba(99,102,241,0.15);
 }
 
-#ragQuestion::placeholder{
-    color:#888;
-}
